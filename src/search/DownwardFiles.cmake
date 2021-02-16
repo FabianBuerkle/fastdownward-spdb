@@ -723,7 +723,9 @@ fast_downward_plugin(
         pdbs/pdb_heuristic
         pdbs/plugin_group
         pdbs/symbolic_pattern_database
+        pdbs/spdb
         pdbs/spdb_heuristic
+        pdbs/symbolic_pdb_heuristic
         pdbs/types
         pdbs/validation
         pdbs/zero_one_pdbs
