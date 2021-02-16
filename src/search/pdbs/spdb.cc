@@ -1,4 +1,4 @@
-#include "symbolic_pattern_database.h"
+#include "spdb.h"
 
 #include "../symbolic/transition_relation.h"
 
@@ -24,7 +24,7 @@ using namespace symbolic;
 
 namespace pdbs {
 
-SymbolicPatternDatabase::SymbolicPatternDatabase(SymVariables *sVars, 
+SPDB::SPDB(SymVariables *sVars, 
                                                  const TaskProxy &task_proxy,
                                                  const Pattern &pattern,
                                                  bool dump,
@@ -38,10 +38,10 @@ SymbolicPatternDatabase::SymbolicPatternDatabase(SymVariables *sVars,
   utils::Timer timer;
   create_spdb(task_proxy, operator_costs);
   if (dump)
-    cout << "SymbolicPatternDatabase construction time: " << timer << endl;
+    cout << "SPDB construction time: " << timer << endl;
 }
 
-void SymbolicPatternDatabase::create_spdb(const TaskProxy &task_proxy,
+void SPDB::create_spdb(const TaskProxy &task_proxy,
                                           const vector<int> &operator_costs) {
   BDD one = sV->oneBDD();
   BDD zero = sV->zeroBDD();
@@ -50,6 +50,7 @@ void SymbolicPatternDatabase::create_spdb(const TaskProxy &task_proxy,
   int debug = 0;  
   VariablesProxy variables = task_proxy.get_variables();
   initialHVal = numeric_limits<int>::max();
+/*
   vector<BDD> varEval;
   ADD utilityComplete = zero.Add();
   for (auto var : variables) {  
@@ -60,12 +61,10 @@ void SymbolicPatternDatabase::create_spdb(const TaskProxy &task_proxy,
       utility += (fact.Add() * value);
       utilityComplete += (fact.Add() * value);
     }
-///*  
+  
     double maxUtil = Cudd_V(utility.FindMax().getNode());
-    double minUtil = Cudd_V(utility.FindMin().getNode());    
-    //cout << maxUtil << endl;
-    //cout << "NODES: " << utility.nodeCount() << endl;
-//*/
+    double minUtil = Cudd_V(utility.FindMin().getNode());
+
     for (int val = 0; val <= maxUtil; val++) {
       BDD showing = utility.BddInterval(val, val);
       //sV->bdd_to_dot(showing, "showing_" + to_string(var.get_id()) + "_" + to_string(val) + ".gv");
@@ -75,7 +74,7 @@ void SymbolicPatternDatabase::create_spdb(const TaskProxy &task_proxy,
   double mxH = Cudd_V(utilityComplete.FindMax().getNode());
   double mnH = Cudd_V(utilityComplete.FindMin().getNode());
   //cout << mnH << "    " << mxH << endl;
-
+*/
   if (variables.size() > pattern.size()) {
     abstract = 1;
     for (auto var : variables) {
@@ -103,15 +102,13 @@ void SymbolicPatternDatabase::create_spdb(const TaskProxy &task_proxy,
     costSortedTR.emplace_back(t);
   }
   State initialState = task_proxy.get_initial_state();
-  BDD initBDD = one;  
+  BDD initBDD = one;
   for (size_t v = 0; v < pattern.size(); v++) {
     int var_id = initialState[pattern[v]].get_variable().get_id();
     int val = initialState[pattern[v]].get_value();
     initBDD *= sV->preBDD(var_id, val);
   }
   initial = initBDD;
-  sV->bdd_to_dot(initBDD, "initial.gv");  
-  //cout << "initBDD:" << initBDD << endl;
   BDD goals = one;
   int varCount = 0;
   ADD add_utility = zero.Add();
@@ -122,8 +119,6 @@ void SymbolicPatternDatabase::create_spdb(const TaskProxy &task_proxy,
     //if (it != pattern.end()) varCount++;
     goals *= sV->preBDD(var_id, val);
   }
-  sV->bdd_to_dot(goals, "goal.gv");
-  //cout << "goalBDD" << goals << endl;
 /*
   bool allGoal = 0;
   if (varCount == pattern.size()) {
@@ -139,7 +134,6 @@ void SymbolicPatternDatabase::create_spdb(const TaskProxy &task_proxy,
   closedList.emplace_back(goals);
   bool initFound = 0;
   while (h < closedList.size()) {
-    //cout << "\nh = " << h << endl;
     for (size_t t = 0; t < costSortedTR.size(); t++) {
       BDD regressed = costSortedTR[t]->preimage(actualState);
       int cost = costSortedTR[t]->getCost();
@@ -154,7 +148,6 @@ void SymbolicPatternDatabase::create_spdb(const TaskProxy &task_proxy,
         if (initialHVal == numeric_limits<int>::max()) {
           initialHVal = h + cost;
           bestH = initialHVal;
-//          cout << "INIT REACHED FIRST TIME! at h = " << bestH << endl;
         } else {
           continue;
         }
@@ -173,28 +166,13 @@ void SymbolicPatternDatabase::create_spdb(const TaskProxy &task_proxy,
       sV->bdd_to_dot(closedList[h] , "state" + to_string((int)h) + ".gv");
     }
     h++;
-    if (h >= closedList.size()) {break;}  
-/*
-    for (int i = 0; i < closedList.size(); i++) {
-      if (i == h) {continue;}
-      BDD result = closedList[i] * closedList[h];
-      cout << i << "  " << h << ": " << (closedList[i] * closedList[h] != zero) << endl;
-      if (result != zero) {
-        cout << (closedList[i] <= closedList[h]) << endl;
-        cout << (closedList[h] <= closedList[i]) << endl;
-        cout << (closedList[i] * !closedList[h] == zero) << endl;
-        cout << (closedList[h] * !closedList[i] == zero) << endl;
-      }     
-      cout << endl;
-    }
-*/
+    if (h >= closedList.size()) {break;}
     closedList[h] *= !visited;
-    BDD actUpdate = closedList[h] * !visited;
-    BDD visUpdate = visited | actUpdate;
-    visited = visUpdate;
-    actualState = actUpdate;
+//  BDD visUpdate = visited | actUpdate;
+//  visited = visUpdate;
+    actualState = closedList[h];
+    visited |= closedList[h];
   }
-  
   ADD heuristicValue = zero.Add();
   heuristic = zero.Add();
   for (int i = 0; i < closedList.size(); i++) {
@@ -202,33 +180,24 @@ void SymbolicPatternDatabase::create_spdb(const TaskProxy &task_proxy,
     heuristicValue = (closedList[i].Add() * value);    
     heuristic += heuristicValue;
   }
-//cout << Cudd_V(heuristic.FindMin().getNode()) << endl;
-  //cout << Cudd_V(heuristic.FindMax().getNode()) << endl;
-/*
-  for (int i = 0; i < closedList.size(); i++) {  
-    ADD hVAL = closedList[i].Add() * heuristic;
-    ADD varE = closedList[i].Add() * utilityComplete;
-    cout <<  "\n" << i << endl;
-    cout << Cudd_V(hVAL.FindMax().getNode()) << endl;
-    cout << endl;
-  }
-*/
 }
 
-int SymbolicPatternDatabase::get_value(const State &state) const {
+int SPDB::get_value(const State &state) const {
   BDD stateBDD = sV->oneBDD();
   for (size_t w = 0; w < pattern.size(); w++) {
     int var_id = state[pattern[w]].get_variable().get_id();
     int val = state[pattern[w]].get_value();
     stateBDD *= sV->preBDD(var_id, val);
   }
-  return compute_value(stateBDD);
+
+  ADD hval = (stateBDD.Add() * heuristic);
+  return Cudd_V(hval.FindMax().getNode());
 }
 
-int SymbolicPatternDatabase::compute_value(const BDD &state) const {
+int SPDB::compute_value(const BDD &state) const {
   for (int h = 0; h < closedList.size(); h++) {
     if (state <= closedList[h]) { return h; }
-    if (state >= closedList[h]) { return h; }
+    //if (state >= closedList[h]) { return h; }
   }
   return numeric_limits<int>::max();
 }
