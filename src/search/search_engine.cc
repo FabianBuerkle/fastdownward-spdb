@@ -113,7 +113,7 @@ bool SearchEngine::check_goal_and_set_plan(const GlobalState &state) {
 }
 
 void SearchEngine::save_plan_if_necessary() {
-    if (found_solution()) {
+    if (found_solution() && save_plans) {
         plan_manager.save_plan(get_plan(), task_proxy);
     }
 }

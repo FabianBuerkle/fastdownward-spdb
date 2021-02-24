@@ -70,6 +70,7 @@ int main(int argc, const char **argv) {
         error.print();
         utils::exit_with(ExitCode::SEARCH_INPUT_ERROR);
     }
+
     std::chrono::steady_clock::time_point wall_begin = std::chrono::steady_clock::now();
     utils::Timer search_timer;
     engine->search();
@@ -77,7 +78,7 @@ int main(int argc, const char **argv) {
     std::chrono::steady_clock::time_point wall_end = std::chrono::steady_clock::now();
     utils::g_timer.stop();
 
-    // engine->save_plan_if_necessary();
+    engine->save_plan_if_necessary();
     engine->print_statistics();
     cout << "Search time: " << search_timer << endl;
     cout << "Search-Wall time: " << std::chrono::duration_cast<std::chrono::microseconds>(wall_end - wall_begin).count() / 1000000.0 << "s" << endl;

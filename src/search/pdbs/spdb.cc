@@ -47,34 +47,30 @@ void SPDB::create_spdb(const TaskProxy &task_proxy,
   BDD zero = sV->zeroBDD();
   BDD cube = one;
   bool abstract = 0;
-  int debug = 0;  
+  bool debug = 0;  
   VariablesProxy variables = task_proxy.get_variables();
   initialHVal = numeric_limits<int>::max();
-/*
+
   vector<BDD> varEval;
-  ADD utilityComplete = zero.Add();
   for (auto var : variables) {  
-    ADD utility = zero.Add();    
+    ADD varValue = zero.Add();    
     for (int v = 0; v < var.get_domain_size(); v++) {
       BDD fact = sV->get_axiom_compiliation()->get_primary_representation(var.get_id(), v);
       ADD value = sV->get_manager()->constant(v);
-      utility += (fact.Add() * value);
-      utilityComplete += (fact.Add() * value);
+      varValue += (fact.Add() * value);
+      //cout << "fact: " << fact << endl;
     }
-  
-    double maxUtil = Cudd_V(utility.FindMax().getNode());
-    double minUtil = Cudd_V(utility.FindMin().getNode());
-
-    for (int val = 0; val <= maxUtil; val++) {
-      BDD showing = utility.BddInterval(val, val);
-      //sV->bdd_to_dot(showing, "showing_" + to_string(var.get_id()) + "_" + to_string(val) + ".gv");
+///*  
+    double maxVarVal = Cudd_V(varValue.FindMax().getNode());
+    double minVarVal = Cudd_V(varValue.FindMin().getNode());
+//*/
+    for (int val = 0; val <= maxVarVal; val++) {
+      BDD showing = varValue.BddInterval(val, val);
+      //cout << "vars: " << showing << endl;
       varEval.emplace_back(showing);
     }
   }
-  double mxH = Cudd_V(utilityComplete.FindMax().getNode());
-  double mnH = Cudd_V(utilityComplete.FindMin().getNode());
-  //cout << mnH << "    " << mxH << endl;
-*/
+
   if (variables.size() > pattern.size()) {
     abstract = 1;
     for (auto var : variables) {
@@ -83,9 +79,12 @@ void SPDB::create_spdb(const TaskProxy &task_proxy,
         for(int index : sV->vars_index_pre(var.get_id())) {
           cube *= sV->bddVar(index);
         }
+      } else {
+        //cout << " PATTERN VAR ";
       }
+      //cout << endl;
     }
-    //cout <<"PATTERN: " << cube << endl;    
+    //cout <<"ABSTRACTION_PATTERN: " << cube << endl;    
   }
   // used for effective storing of the TR for operators of same cost.
   std::vector<TransitionRelation *> costSortedTR;
@@ -111,54 +110,69 @@ void SPDB::create_spdb(const TaskProxy &task_proxy,
   initial = initBDD;
   BDD goals = one;
   int varCount = 0;
-  ADD add_utility = zero.Add();
+//  ADD add_utility = zero.Add();
   for (FactProxy goal : task_proxy.get_goals()) {
     int var_id = goal.get_variable().get_id();
     int val = goal.get_value();
-    //auto it = find(pattern.begin(), pattern.end(), var_id);    
-    //if (it != pattern.end()) varCount++;
-    goals *= sV->preBDD(var_id, val);
+    auto it = find(pattern.begin(), pattern.end(), var_id);    
+    if (it != pattern.end()) {
+      goals *= sV->preBDD(var_id, val);
+    }
   }
-/*
+///*
+  if (debug) {
+    sV->bdd_to_dot(initial, "initialState.gv");
+    sV->bdd_to_dot(goals, "goalState.gv");
+  }
+  //cout << "INIT:" << initial << endl;
+  //cout << "GOAL:" << goals << endl;
   bool allGoal = 0;
   if (varCount == pattern.size()) {
     cout << "PATTERN CONTAINS EXACTLY ALL GOAL VARS" << endl;
     allGoal = 1;
   }
-*/
+//*/
   //heuristicValueBuckets.resize(1);
   //heuristicValueBuckets[0].emplace_back(goals);
   int h = 0;// Variable to take care of actual heuristic Value for Set of States
   BDD actualState = goals;
   BDD visited = goals;
+  BDD explored = zero;
   closedList.emplace_back(goals);
-  bool initFound = 0;
   while (h < closedList.size()) {
+    //cout << "\nh = " << h << endl;
     for (size_t t = 0; t < costSortedTR.size(); t++) {
       BDD regressed = costSortedTR[t]->preimage(actualState);
       int cost = costSortedTR[t]->getCost();
       if (regressed == zero) {continue;}
-      if (regressed <= actualState) { continue; }
       if (abstract == 1) {
         BDD abstracted = regressed.ExistAbstract(cube, 0);
         regressed = abstracted;
       }
-      if (regressed <= visited) { continue; }
-      if (initial <= regressed or initial >= regressed) {
+      if (regressed *!visited == zero) {
+        continue;
+      }
+      explored |= regressed;
+      if (initial <= regressed or regressed <= initial) {
         if (initialHVal == numeric_limits<int>::max()) {
           initialHVal = h + cost;
           bestH = initialHVal;
-        } else {
-          continue;
         }
       }
       int hVal = compute_value(regressed);
-
-      if (/*hVal == numeric_limits<int>::max()*/ hVal >= h + cost) {
-        if (closedList.size() <= h + cost) {
+      if (hVal == numeric_limits<int>::max()) {
+        hVal = h + cost;
+        if (closedList.size() <= hVal) {
           closedList.emplace_back(regressed);
         } else {
-          closedList[h + cost] |= regressed;
+          closedList[hVal] |= regressed;
+        }
+      } else {
+        if (regressed <= closedList[hVal]) {
+          closedList[hVal] |= regressed;
+          continue;          
+        } else if (closedList[hVal] <= regressed) {
+          closedList[hVal] = regressed;
         }
       }
     }
@@ -167,11 +181,15 @@ void SPDB::create_spdb(const TaskProxy &task_proxy,
     }
     h++;
     if (h >= closedList.size()) {break;}
+    if (closedList[h] >= initial) {
+      if (initialHVal == numeric_limits<int>::max()) {      
+        initialHVal = h;
+        bestH = initialHVal;
+      }
+    }
     closedList[h] *= !visited;
-//  BDD visUpdate = visited | actUpdate;
-//  visited = visUpdate;
     actualState = closedList[h];
-    visited |= closedList[h];
+    visited |= (explored | actualState);
   }
   ADD heuristicValue = zero.Add();
   heuristic = zero.Add();
@@ -180,6 +198,7 @@ void SPDB::create_spdb(const TaskProxy &task_proxy,
     heuristicValue = (closedList[i].Add() * value);    
     heuristic += heuristicValue;
   }
+  //cout << Cudd_V(heuristic.FindMin().getNode()) << "   " << Cudd_V(heuristic.FindMax().getNode()) << endl; 
 }
 
 int SPDB::get_value(const State &state) const {
@@ -187,10 +206,13 @@ int SPDB::get_value(const State &state) const {
   for (size_t w = 0; w < pattern.size(); w++) {
     int var_id = state[pattern[w]].get_variable().get_id();
     int val = state[pattern[w]].get_value();
-    stateBDD *= sV->preBDD(var_id, val);
+    BDD st = sV->preBDD(var_id, val);
+    stateBDD *= st;
   }
-
+  //return compute_value(stateBDD);
+  //cout << stateBDD << endl;
   ADD hval = (stateBDD.Add() * heuristic);
+  //cout << Cudd_V(hval.FindMax().getNode()) << endl;
   return Cudd_V(hval.FindMax().getNode());
 }
 

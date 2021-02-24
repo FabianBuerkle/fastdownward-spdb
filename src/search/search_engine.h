@@ -35,6 +35,7 @@ class SearchEngine {
   protected:
     bool solution_found;
     // Hold a reference to the task implementation and pass it to objects that need it.
+    bool save_plans;
     const std::shared_ptr<AbstractTask> task;
     // Use task_proxy to access task information.
     TaskProxy task_proxy;
