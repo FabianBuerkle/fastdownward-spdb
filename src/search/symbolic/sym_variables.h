@@ -24,7 +24,7 @@ class GlobalState;
 namespace options {
 class Options;
 class OptionParser;
-}
+} // namespace options
 
 namespace symbolic {
 
@@ -44,7 +44,7 @@ class SymVariables {
   const long cudd_init_nodes;            // Number of initial nodes
   const long cudd_init_cache_size;       // Initial cache size
   const long cudd_init_available_memory; // Maximum available memory (bytes)
-  bool gamer_ordering;
+  const bool gamer_ordering;
 
   std::unique_ptr<Cudd> manager; // manager associated with this symbolic search
   std::shared_ptr<SymAxiomCompilation> ax_comp;  // used for axioms
@@ -77,6 +77,7 @@ class SymVariables {
 
 public:
   SymVariables(const options::Options &opts);
+  SymVariables(bool gamer_ordering);
   void init();
 
   std::shared_ptr<StateRegistry> get_state_registry() {
@@ -91,13 +92,13 @@ public:
     return ax_comp;
   }
 
+  Cudd *get_manager() const { return manager.get(); }
+
   // State getStateFrom(const BDD & bdd) const;
   BDD getStateBDD(const std::vector<int> &state) const;
   BDD getStateBDD(const GlobalState &state) const;
 
   BDD getPartialStateBDD(const std::vector<std::pair<int, int>> &state) const;
-
-  void bdd_to_dot(const BDD &bdd, const std::string &file_name) const;
 
   inline const std::vector<int> &vars_index_pre(int variable) const {
     return bdd_index_pre[variable];

@@ -12,11 +12,12 @@
 #include <iostream>
 #include <sstream>
 #include <string>
-#include <stdlib.h>
+
 using namespace std;
 using options::Options;
 
 namespace symbolic {
+
 void exceptionError(string /*message*/) {
   // cout << message << endl;
   throw BDDError();
@@ -25,14 +26,17 @@ void exceptionError(string /*message*/) {
 SymVariables::SymVariables(const Options &opts)
     : cudd_init_nodes(16000000L), cudd_init_cache_size(16000000L),
       cudd_init_available_memory(0L),
-      gamer_ordering(true) {
-}
+      gamer_ordering(opts.get<bool>("gamer_ordering")) {}
+
+SymVariables::SymVariables(bool gamer_ordering)
+    : cudd_init_nodes(16000000L), cudd_init_cache_size(16000000L),
+      cudd_init_available_memory(0L), gamer_ordering(gamer_ordering) {}
 
 void SymVariables::init() {
-  vector<int> var_order;     
+  vector<int> var_order;
   if (gamer_ordering) {
     InfluenceGraph::compute_gamer_ordering(var_order);
-  } else {  
+  } else {
     for (int i = 0; i < tasks::g_root_task->get_num_variables(); ++i) {
       var_order.push_back(i);
     }
@@ -105,6 +109,7 @@ void SymVariables::init(const vector<int> &v_order) {
          j++) {
       validValues[var] += preconditionBDDs[var][j];
     }
+    validBDD *= validValues[var];
     biimpBDDs[var] =
         createBiimplicationBDD(bdd_index_pre[var], bdd_index_eff[var]);
   }
@@ -230,33 +235,4 @@ void SymVariables::add_options_to_parser(options::OptionParser &parser) {
   parser.add_option<bool>("gamer_ordering", "Use Gamer ordering optimization",
                           "true");
 }
-void SymVariables::bdd_to_dot(const BDD &bdd, const std::string &file_name) const {
-  int num_vars = numBDDVars * 2;
-  std::vector<string> var_names(num_vars);
-  for (int v : var_order) {
-    int exp = 0;
-    for (int j : bdd_index_pre[v]) {
-      var_names[j] = tasks::g_root_task->get_fact_name(FactPair(v, 1));
-      var_names[j + 1] = tasks::g_root_task->get_fact_name(FactPair(v, 1));
-      exp++;
-    }
-  }
-
-  std::vector<char *> names(num_vars);
-  for (int i = 0; i < num_vars; ++i) {
-    names[i] = &var_names[i].front();
-  }
-  FILE *outfile = fopen(file_name.c_str(), "w");
-  DdNode * ddnodearray = (DdNode *)malloc(sizeof(bdd.Add().getNode()));
-  DdNode* x = bdd.Add().getNode();
-  DdNode** y = &x;
- // ddnodearray[0] = bdd.Add().getNode();
-  // std::cout << bdd.Add().nodeCount() << std::endl;
-  Cudd_DumpDot(manager->getManager(), 1, y, names.data(), NULL,
-  outfile); // dump the function to .dot file names.data()
-  free(ddnodearray);
-  fclose(outfile);
-}
-
 } // namespace symbolic
-#include "sym_variables.h"
