@@ -212,6 +212,8 @@ public:
   static void add_options_to_parser(options::OptionParser &parser);
 
   void print_options() const;
+  
+  void bdd_to_dot(const BDD &bdd, const std::string &file_name) const;
 
 private:
   // Auxiliar function helping to create precondition and effect BDDs

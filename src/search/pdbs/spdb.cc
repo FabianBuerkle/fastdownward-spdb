@@ -51,26 +51,6 @@ void SPDB::create_spdb(const TaskProxy &task_proxy,
   VariablesProxy variables = task_proxy.get_variables();
   initialHVal = numeric_limits<int>::max();
 
-  vector<BDD> varEval;
-  for (auto var : variables) {  
-    ADD varValue = zero.Add();    
-    for (int v = 0; v < var.get_domain_size(); v++) {
-      BDD fact = sV->get_axiom_compiliation()->get_primary_representation(var.get_id(), v);
-      ADD value = sV->get_manager()->constant(v);
-      varValue += (fact.Add() * value);
-      //cout << "fact: " << fact << endl;
-    }
-///*  
-    double maxVarVal = Cudd_V(varValue.FindMax().getNode());
-    double minVarVal = Cudd_V(varValue.FindMin().getNode());
-//*/
-    for (int val = 0; val <= maxVarVal; val++) {
-      BDD showing = varValue.BddInterval(val, val);
-      //cout << "vars: " << showing << endl;
-      varEval.emplace_back(showing);
-    }
-  }
-
   if (variables.size() > pattern.size()) {
     abstract = 1;
     for (auto var : variables) {
@@ -79,12 +59,8 @@ void SPDB::create_spdb(const TaskProxy &task_proxy,
         for(int index : sV->vars_index_pre(var.get_id())) {
           cube *= sV->bddVar(index);
         }
-      } else {
-        //cout << " PATTERN VAR ";
       }
-      //cout << endl;
     }
-    //cout <<"ABSTRACTION_PATTERN: " << cube << endl;    
   }
   // used for effective storing of the TR for operators of same cost.
   std::vector<TransitionRelation *> costSortedTR;
@@ -119,21 +95,15 @@ void SPDB::create_spdb(const TaskProxy &task_proxy,
       goals *= sV->preBDD(var_id, val);
     }
   }
-///*
   if (debug) {
     sV->bdd_to_dot(initial, "initialState.gv");
     sV->bdd_to_dot(goals, "goalState.gv");
   }
-  //cout << "INIT:" << initial << endl;
-  //cout << "GOAL:" << goals << endl;
   bool allGoal = 0;
   if (varCount == pattern.size()) {
     cout << "PATTERN CONTAINS EXACTLY ALL GOAL VARS" << endl;
     allGoal = 1;
   }
-//*/
-  //heuristicValueBuckets.resize(1);
-  //heuristicValueBuckets[0].emplace_back(goals);
   int h = 0;// Variable to take care of actual heuristic Value for Set of States
   BDD actualState = goals;
   BDD visited = goals;
@@ -198,7 +168,6 @@ void SPDB::create_spdb(const TaskProxy &task_proxy,
     heuristicValue = (closedList[i].Add() * value);    
     heuristic += heuristicValue;
   }
-  //cout << Cudd_V(heuristic.FindMin().getNode()) << "   " << Cudd_V(heuristic.FindMax().getNode()) << endl; 
 }
 
 int SPDB::get_value(const State &state) const {
@@ -209,17 +178,13 @@ int SPDB::get_value(const State &state) const {
     BDD st = sV->preBDD(var_id, val);
     stateBDD *= st;
   }
-  //return compute_value(stateBDD);
-  //cout << stateBDD << endl;
   ADD hval = (stateBDD.Add() * heuristic);
-  //cout << Cudd_V(hval.FindMax().getNode()) << endl;
   return Cudd_V(hval.FindMax().getNode());
 }
 
 int SPDB::compute_value(const BDD &state) const {
   for (int h = 0; h < closedList.size(); h++) {
     if (state <= closedList[h]) { return h; }
-    //if (state >= closedList[h]) { return h; }
   }
   return numeric_limits<int>::max();
 }
