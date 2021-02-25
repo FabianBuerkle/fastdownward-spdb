@@ -21,12 +21,12 @@ CMAKE = "cmake"
 DEFAULT_MAKE_PARAMETERS = []
 if os.name == "posix":
     MAKE = "make"
-    try:
-        num_cpus = multiprocessing.cpu_count()
-    except NotImplementedError:
-        pass
-    else:
-        DEFAULT_MAKE_PARAMETERS.append('-j{}'.format(num_cpus))
+    #try:
+    #    num_cpus = multiprocessing.cpu_count()
+    #except NotImplementedError:
+    #    pass
+    #else:
+    #    DEFAULT_MAKE_PARAMETERS.append('-j{}'.format(num_cpus))
     CMAKE_GENERATOR = "Unix Makefiles"
 elif os.name == "nt":
     MAKE = "nmake"
