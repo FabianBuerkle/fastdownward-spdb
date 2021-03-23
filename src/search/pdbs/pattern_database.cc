@@ -289,8 +289,8 @@ size_t PatternDatabase::hash_index(const State &state) const {
     return index;
 }
 
-int PatternDatabase::get_value(const State &state) const {
-    return distances[hash_index(state)];
+int PatternDatabase::get_value(const State &state) const {    
+  return distances[hash_index(state)];
 }
 
 double PatternDatabase::compute_mean_finite_h() const {

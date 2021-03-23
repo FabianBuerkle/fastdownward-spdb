@@ -12,11 +12,12 @@
 #include <iostream>
 #include <sstream>
 #include <string>
-#include <stdlib.h>
+
 using namespace std;
 using options::Options;
 
 namespace symbolic {
+
 void exceptionError(string /*message*/) {
   // cout << message << endl;
   throw BDDError();
@@ -25,14 +26,17 @@ void exceptionError(string /*message*/) {
 SymVariables::SymVariables(const Options &opts)
     : cudd_init_nodes(16000000L), cudd_init_cache_size(16000000L),
       cudd_init_available_memory(0L),
-      gamer_ordering(true) {
-}
+      gamer_ordering(true) {}
+
+SymVariables::SymVariables(bool gamer_ordering)
+    : cudd_init_nodes(16000000L), cudd_init_cache_size(16000000L),
+      cudd_init_available_memory(0L), gamer_ordering(gamer_ordering) {}
 
 void SymVariables::init() {
-  vector<int> var_order;     
+  vector<int> var_order;
   if (gamer_ordering) {
     InfluenceGraph::compute_gamer_ordering(var_order);
-  } else {  
+  } else {
     for (int i = 0; i < tasks::g_root_task->get_num_variables(); ++i) {
       var_order.push_back(i);
     }
@@ -105,6 +109,7 @@ void SymVariables::init(const vector<int> &v_order) {
          j++) {
       validValues[var] += preconditionBDDs[var][j];
     }
+    validBDD *= validValues[var];
     biimpBDDs[var] =
         createBiimplicationBDD(bdd_index_pre[var], bdd_index_eff[var]);
   }
@@ -230,6 +235,7 @@ void SymVariables::add_options_to_parser(options::OptionParser &parser) {
   parser.add_option<bool>("gamer_ordering", "Use Gamer ordering optimization",
                           "true");
 }
+
 void SymVariables::bdd_to_dot(const BDD &bdd, const std::string &file_name) const {
   int num_vars = numBDDVars * 2;
   std::vector<string> var_names(num_vars);
@@ -259,4 +265,3 @@ void SymVariables::bdd_to_dot(const BDD &bdd, const std::string &file_name) cons
 }
 
 } // namespace symbolic
-#include "sym_variables.h"

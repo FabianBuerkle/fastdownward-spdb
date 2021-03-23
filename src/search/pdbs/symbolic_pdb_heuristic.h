@@ -1,7 +1,7 @@
-#ifndef PDBS_SPDB_HEURISTIC_H
-#define PDBS_SPDB_HEURISTIC_H
+#ifndef PDBS_SYMBOLIC_PDB_HEURISTIC_H
+#define PDBS_SYMBOLIC_PDB_HEURISTIC_H
 
-#include "spdb.h"
+#include "symbolic_pattern_database.h"
 
 #include "../heuristic.h"
 
@@ -15,8 +15,8 @@ using namespace symbolic;
 //class SymVariables;
 namespace pdbs {
 // Implements a heuristic for a single PDB.
-class SPDBHeuristic : public Heuristic {
-    SPDB spdb;
+class SymbolicPDBHeuristic : public Heuristic {
+    SymbolicPatternDatabase spdb;
 protected:
     virtual int compute_heuristic(const GlobalState &global_state) override;
     /* TODO: we want to get rid of compute_heuristic(const GlobalState &state)
@@ -34,8 +34,8 @@ public:
        operator. This is useful for action cost partitioning. If left
        empty, default operator costs are used.
     */
-    SPDBHeuristic(const options::Options &opts);
-    virtual ~SPDBHeuristic() override = default;
+    SymbolicPDBHeuristic(const options::Options &opts);
+    virtual ~SymbolicPDBHeuristic() override = default;
 };
 }
 

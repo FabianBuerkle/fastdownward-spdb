@@ -84,7 +84,6 @@ void SPDB::create_spdb(const TaskProxy &task_proxy,
   initial = initBDD;
   BDD goals = one;
   int varCount = 0;
-
   for (FactProxy goal : task_proxy.get_goals()) {
     int var_id = goal.get_variable().get_id();
     int val = goal.get_value();
@@ -143,6 +142,9 @@ void SPDB::create_spdb(const TaskProxy &task_proxy,
           closedList[hVal] = regressed;
         }
       }
+    }
+    if (debug == 1) {
+      sV->bdd_to_dot(closedList[h] , "state" + to_string((int)h) + ".gv");
     }
     h++;
     if (h >= closedList.size()) {break;}

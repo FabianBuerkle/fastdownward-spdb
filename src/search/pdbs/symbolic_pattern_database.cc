@@ -56,6 +56,7 @@ BDD one = sV->oneBDD();
       varEval[var.get_id()].push_back(varVal);
     }
   }
+  
   if (variables.size() > pattern.size()) {
     abstract = 1;
     for (auto var : variables) {
@@ -86,7 +87,6 @@ BDD one = sV->oneBDD();
       mergedTR[op_cost]->merge(*t, numeric_limits<int>::max());
     }
   }
-
   BDD goals = one;
   int varCount = 0;
 
@@ -146,7 +146,7 @@ int SymbolicPatternDatabase::get_value(const State &state) const {
   for (size_t w = 0; w < pattern.size(); w++) {
     int var_id = state[pattern[w]].get_variable().get_id();
     int val = state[pattern[w]].get_value();
-    BDD st = varEval[var_id][val];
+    BDD st = sV->preBDD(var_id, val);
     stateBDD *= st;
   }
   return Cudd_V((stateBDD.Add() * heuristic).FindMax().getNode());
