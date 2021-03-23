@@ -24,12 +24,12 @@ using namespace symbolic;
 
 namespace pdbs {
 
-SymbolicPatternDatabase::SymbolicPatternDatabase(SymVariables *sVars,
-	       					 const TaskProxy &task_proxy,
-	       					 const Pattern &pattern,
-						 bool dump,
-						 const vector<int> &operator_costs)
-       	:sV(sVars), pattern(pattern) { 
+SymbolicPatternDatabase::SymbolicPatternDatabase(SymVariables *sVars, 
+                                                 const TaskProxy &task_proxy,
+                                                 const Pattern &pattern,
+                                                 bool dump,
+                                                 const vector<int> &operator_costs)
+:sV(sVars), pattern(pattern) {
   task_properties::verify_no_axioms(task_proxy);
   task_properties::verify_no_conditional_effects(task_proxy);
   assert(operator_costs.empty() ||
@@ -38,151 +38,118 @@ SymbolicPatternDatabase::SymbolicPatternDatabase(SymVariables *sVars,
   utils::Timer timer;
   create_spdb(task_proxy, operator_costs);
   if (dump)
-    cout << "SPDB construction time: " << timer << endl;
+    cout << "SymbolicPatternDatabase construction time: " << timer << endl;
 }
 
-void SymbolicPatternDatabase::create_spdb(
-  const TaskProxy &task_proxy, const vector<int> &operator_costs) {
+void SymbolicPatternDatabase::create_spdb(const TaskProxy &task_proxy,
+                                          const vector<int> &operator_costs) {
+BDD one = sV->oneBDD();
+  BDD zero = sV->zeroBDD();
+  BDD cube = one;
+  bool abstract = 0;
+  bool debug = 0;  
   VariablesProxy variables = task_proxy.get_variables();
-  vector<int> variable_to_index(variables.size(), -1);
-  for (size_t i = 0; i < pattern.size(); ++i) {
-    variable_to_index[pattern[i]] = i;
+  varEval.resize(variables.size());
+  for (auto var : variables) {
+    for (int i = 0; i < var.get_domain_size(); i++) {
+      BDD varVal = sV->preBDD(var.get_id(), i);
+      varEval[var.get_id()].push_back(varVal);
+    }
   }
-
+  if (variables.size() > pattern.size()) {
+    abstract = 1;
+    for (auto var : variables) {
+      auto it = find(pattern.begin(), pattern.end(), var.get_id());
+      if (it == pattern.end()) {
+        for(int index : sV->vars_index_pre(var.get_id())) {
+          cube *= sV->bddVar(index);
+        }
+      }
+    }
+  }
   // used for effective storing of the TR for operators of same cost.
-  std::vector<std::vector<TransitionRelation *> > costSortedTR;
+  std::vector<TransitionRelation *> mergedTR;
   for (OperatorProxy op : task_proxy.get_operators()) {
     int op_cost;
     if (operator_costs.empty()) {
       op_cost = op.get_cost();
-      costSortedTR.resize(op.get_cost() + 1);
     } else {
       op_cost = operator_costs[op.get_id()];
     }
     OperatorID opID(op.get_id());
     TransitionRelation *t = new TransitionRelation(sV, opID, op_cost);
     t->init();
-    costSortedTR[op_cost].emplace_back(t);
+    if (mergedTR.size() < op_cost) {
+      mergedTR.resize(op_cost + 1);
+      mergedTR[op_cost] = t;
+    } else {
+      mergedTR[op_cost]->merge(*t, numeric_limits<int>::max());
+    }
   }
 
-  BDD goals = sV->oneBDD();
+  BDD goals = one;
+  int varCount = 0;
+
   for (FactProxy goal : task_proxy.get_goals()) {
     int var_id = goal.get_variable().get_id();
     int val = goal.get_value();
-    goals *= sV->preBDD(var_id, val);
-  } 
-  
-  heuristicValueBuckets.resize(costSortedTR.size()-1);
-  heuristicValueBuckets[0].push_back(goals);
-  int i = 0;// Variable to take care of actual heuristic Value for Set of States(h=i)
-  //cout << i << endl;
-  BDD actualState;
-  int debug = 0; 
-  do {
-    for (size_t j = 0; j <= heuristicValueBuckets[i].size() - 1; j++) {
-      actualState = heuristicValueBuckets[i][j];
-      //vector<int> preimagesTR;
-      //vector<int> preimagesNoImprovement;
-      //bool alreadyCreatedPred = 0;
-      
-      for (size_t a = 0; a < costSortedTR.size(); a++) {
-	if (heuristicValueBuckets.size() - 1 < i + a) {
-	  heuristicValueBuckets.resize(i + a + 1);
-	} 
-	for (size_t b = 0; b < costSortedTR[a].size(); b++) {
-	  BDD regressed = (costSortedTR[a][b])->preimage(actualState);
-	  // Check, whether state has changed due to transition relation and add BDD into actual
-          // Heuristic Bucket. If it is added, we also have to adjust the number of State Sets 
-          // with the same cost
-          if (regressed != actualState && regressed != sV->zeroBDD()) {
-	    //preimagesTR.push_back(b);
-	    bool not_improved = 0;
-	    for (int c = heuristicValueBuckets.size()-1; c > -1; c--) {
-	      vector<BDD> found = heuristicValueBuckets[c];
-	      for (size_t d = 0; d < found.size(); d++) {
-	        if (found[d] * !regressed == sV->zeroBDD() or found[d] * regressed == regressed) {
-		  //if (c > i) {
-		  //  alreadyCreatedPred = 1;
-		  //}
-		  not_improved = 1;
-		  break;
-		} 
-	      }
-  	      if (not_improved) {
-		//preimagesNoImprovement.push_back(b);
-		break;
-	      }
-	    }
-	    if (not_improved) {
-	      continue;
-	    } 
-	    /*
-	    if (debug == 1) {
-	      std::string filename1 = "regressed" + std::to_string((int)i) + 
-	      "_" + std::to_string((int)j) +  "_" + std::to_string((int)b) +".gv";
-              sV->bdd_to_dot(regressed, filename1);
-              cout <<"REGRESSION DUE TO TR #" << b << ": " << endl;
-	    }
-	    */
-	    heuristicValueBuckets[i+a].push_back(regressed);
-	  }
-        }
-      }
-      /*vector<int> improvingTR;
-      for (size_t w = 0; w < preimagesTR.size(); w++) {
-      	bool commonTR = 0;
-        for (size_t x = 0; x < preimagesNoImprovement.size(); x++) {
-	  if (preimagesTR[w] == preimagesNoImprovement[x]) {
-	    commonTR = 1;
-	  } 
-	}
-	if (commonTR == 0) {
-	  improvingTR.push_back(preimagesTR[w]);
-	} 	
-      }
-      if (improvingTR.size() == 0) {
-	if (!alreadyCreatedPred) {
-	  heuristicValueBuckets[i].erase(heuristicValueBuckets[i].begin()+j);
-	  if (j >= 1) { j--;}
-	  else {j = 0;}
-	}
-      }*/
+    auto it = find(pattern.begin(), pattern.end(), var_id);    
+    if (it != pattern.end()) {
+      goals *= varEval[var_id][val];
+      varCount++;
     }
-    //cout << "AFTER PRUNING: states = "<< heuristicValueBuckets[i].size() << endl;
+  }
+  if (debug) {
+    sV->bdd_to_dot(initial, "initialState.gv");
+    sV->bdd_to_dot(goals, "goalState.gv");
+  }
+  bool allGoal = 0;
+  if (varCount == pattern.size()) {
+    allGoal = 1;
+  }
+
+  int i = 0;
+  BDD actState = goals;
+  BDD vis = goals;
+  closed.emplace_back(goals);
+  while (i < closed.size()){
+    //cout << "i = " << i << endl;
+    for (int a = 0; a < mergedTR.size(); a++) {
+      if (a == 0) { continue; }
+      BDD regression = mergedTR[a]->preimage(actState);
+      BDD abs_regression = regression.ExistAbstract(cube, 0);
+      regression = abs_regression;
+      if (regression == zero) {continue;}
+      if (closed.size() <= i + a) {
+        closed.emplace_back(regression);
+      } else {
+        closed[i + a] |= regression;
+      }
+    }
     i++;
-    if(heuristicValueBuckets[i].size() == 0) {break;}
-  } while (i <= heuristicValueBuckets.size()); 
-  /*
-  if (debug == 1) {
-    for (int h = 0; h < heuristicValueBuckets.size(); h++) {
-      for (int e = 0; e < heuristicValueBuckets[h].size(); e++) {
-        string fileGV = "actualState" + to_string(int(h)) + "_" + to_string(int(e)) + ".gv";
-        sV->bdd_to_dot(heuristicValueBuckets[h][e], fileGV);
-      }
-    }
-  } 
-  */
+    if ((closed[i] *= !vis) == zero) {closed.resize(i); break;}
+    closed[i] *= !vis; 
+    actState = closed[i];
+    vis |= actState;
+  }
+  ADD heuristicValue = zero.Add();
+  heuristic = zero.Add();
+  for (int i = 0; i < closed.size(); i++) {
+    ADD value = sV->get_manager()->constant(i);
+    heuristicValue = (closed[i].Add() * value);    
+    heuristic += heuristicValue;
+  }
 }
 
 int SymbolicPatternDatabase::get_value(const State &state) const {
   BDD stateBDD = sV->oneBDD();
-  int hValue = -1;
   for (size_t w = 0; w < pattern.size(); w++) {
     int var_id = state[pattern[w]].get_variable().get_id();
     int val = state[pattern[w]].get_value();
-    stateBDD *= sV->preBDD(var_id, val);
+    BDD st = varEval[var_id][val];
+    stateBDD *= st;
   }
-  for (int h = 0; h < heuristicValueBuckets.size(); h++) {
-    vector<BDD> bucket = heuristicValueBuckets[h];
-    bool found = 0;
-    for (size_t s = 0; s < bucket.size(); s++) {
-      if ((bucket[s] * stateBDD) == stateBDD) {
-        found = 1;
-        break;	
-      }
-    }
-    if (found) return h;
-  }
+  return Cudd_V((stateBDD.Add() * heuristic).FindMax().getNode());
 }
 
 }
