@@ -87,6 +87,16 @@ BDD one = sV->oneBDD();
       mergedTR[op_cost]->merge(*t, numeric_limits<int>::max());
     }
   }
+
+  State initialState = task_proxy.get_initial_state();
+  BDD initBDD = one;
+  for (size_t v = 0; v < pattern.size(); v++) {
+    int var_id = initialState[pattern[v]].get_variable().get_id();
+    int val = initialState[pattern[v]].get_value();
+    initBDD *= varEval[var_id][val];
+  }
+  initial = initBDD;
+
   BDD goals = one;
   int varCount = 0;
 
@@ -120,14 +130,19 @@ BDD one = sV->oneBDD();
       BDD abs_regression = regression.ExistAbstract(cube, 0);
       regression = abs_regression;
       if (regression == zero) {continue;}
+      if (initial <= regression) {cout << "INIT FOUND at h = " << i + a << endl;}
       if (closed.size() <= i + a) {
-        closed.emplace_back(regression);
+        closed.resize(i + a + 1);
+        closed[i + a] = regression;
+        //closed.emplace_back(regression);
       } else {
         closed[i + a] |= regression;
       }
+      closed[i + a] *= !vis;
     }
     i++;
-    if ((closed[i] *= !vis) == zero) {closed.resize(i); break;}
+    if (i >= closed.size()) {break;}
+    //if ((closed[i] *= !vis) == zero) {closed.resize(i); break;}
     closed[i] *= !vis; 
     actState = closed[i];
     vis |= actState;
