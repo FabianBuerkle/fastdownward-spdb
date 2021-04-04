@@ -123,18 +123,16 @@ BDD one = sV->oneBDD();
   BDD vis = goals;
   closed.emplace_back(goals);
   while (i < closed.size()){
-    //cout << "i = " << i << endl;
+//    cout << "i = " << i << endl;
     for (int a = 0; a < mergedTR.size(); a++) {
-      if (a == 0) { continue; }
+      if (mergedTR[a] == 0) { continue; }
       BDD regression = mergedTR[a]->preimage(actState);
       BDD abs_regression = regression.ExistAbstract(cube, 0);
       regression = abs_regression;
       if (regression == zero) {continue;}
-      if (initial <= regression) {cout << "INIT FOUND at h = " << i + a << endl;}
       if (closed.size() <= i + a) {
-        closed.resize(i + a + 1);
-        closed[i + a] = regression;
-        //closed.emplace_back(regression);
+        closed.resize(i + a + 1, zero);
+        closed[i + a] = regression * !vis;
       } else {
         closed[i + a] |= regression;
       }
