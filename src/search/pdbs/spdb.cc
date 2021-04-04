@@ -154,7 +154,7 @@ void SPDB::create_spdb(const TaskProxy &task_proxy,
     h++;
     if (h >= closedList.size()) {break;}
     actualState = closedList[h];
-    visited |= explored | actualState);
+    visited |= (explored | actualState);
     if (debug == 1) {
       sV->bdd_to_dot(closedList[h] , "state" + to_string((int)h) + ".gv");
     }
