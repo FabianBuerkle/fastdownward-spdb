@@ -137,7 +137,7 @@ void SPDB::create_spdb(const TaskProxy &task_proxy,
       if (hVal == numeric_limits<int>::max() or (allGoal and hVal != numeric_limits<int>::max())) {
         hVal = h + cost;
         if (closedList.size() <= hVal) {
-          closedList.resize(hVal + 1);
+          closedList.resize(hVal + 1, zero);
           closedList[hVal] = regressed * !visited;
         } else {
           closedList[hVal] |= regressed * !visited;
