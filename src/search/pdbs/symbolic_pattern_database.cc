@@ -80,14 +80,15 @@ BDD one = sV->oneBDD();
     OperatorID opID(op.get_id());
     TransitionRelation *t = new TransitionRelation(sV, opID, op_cost);
     t->init();
-    if (mergedTR.size() < op_cost) {
+    if (mergedTR.size() <= op_cost) {
       mergedTR.resize(op_cost + 1);
+    } 
+    if (mergedTR[op_cost] == 0) {
       mergedTR[op_cost] = t;
     } else {
       mergedTR[op_cost]->merge(*t, numeric_limits<int>::max());
     }
   }
-
   State initialState = task_proxy.get_initial_state();
   BDD initBDD = one;
   for (size_t v = 0; v < pattern.size(); v++) {
@@ -99,7 +100,6 @@ BDD one = sV->oneBDD();
 
   BDD goals = one;
   int varCount = 0;
-
   for (FactProxy goal : task_proxy.get_goals()) {
     int var_id = goal.get_variable().get_id();
     int val = goal.get_value();
@@ -123,7 +123,7 @@ BDD one = sV->oneBDD();
   BDD vis = goals;
   closed.emplace_back(goals);
   while (i < closed.size()){
-//    cout << "i = " << i << endl;
+    cout << "i = " << i << endl;
     for (int a = 0; a < mergedTR.size(); a++) {
       if (mergedTR[a] == 0) { continue; }
       BDD regression = mergedTR[a]->preimage(actState);
@@ -133,12 +133,14 @@ BDD one = sV->oneBDD();
       if (closed.size() <= i + a) {
         closed.resize(i + a + 1, zero);
         closed[i + a] = regression * !vis;
+        cout << "NEW ENTRY! " << i + a << endl;
       } else {
         closed[i + a] |= regression;
       }
       closed[i + a] *= !vis;
     }
     i++;
+    cout << i << "  " << closed.size();
     if (i >= closed.size()) {break;}
     //if ((closed[i] *= !vis) == zero) {closed.resize(i); break;}
     closed[i] *= !vis; 

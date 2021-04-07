@@ -52,21 +52,13 @@ void SPDB::create_spdb(const TaskProxy &task_proxy,
   if (variables.size() > pattern.size()) {
     abstract = 1;
     for (auto var : variables) {
-//      cout << var.get_id() << ": ";
       auto it = find(pattern.begin(), pattern.end(), var.get_id());
-/*
-      for (int index : sV->vars_index_pre(var.get_id())) {
-        cout << sV->bddVar(index) << "  ";
-      }
-      cout << endl;
-*/
       if (it == pattern.end()) {
         for(int index : sV->vars_index_pre(var.get_id())) {
           cube *= sV->bddVar(index);
         }
       }
     }
-//    cout << "PATTERN VAR: " << cube << endl;
   }
   // used for effective storing of the TR for operators of same cost.
   std::vector<TransitionRelation *> costSortedTR;
@@ -108,7 +100,6 @@ void SPDB::create_spdb(const TaskProxy &task_proxy,
   bool allGoal = 0;
   if (varCount == pattern.size()) {
     allGoal = 1;
-//    cout << "ALL GOAL!" << endl;
   }
   // Variable to take care of actual heuristic Value for Set of States
   int h = 0;  
@@ -117,8 +108,6 @@ void SPDB::create_spdb(const TaskProxy &task_proxy,
   BDD explored = zero;
   closedList.emplace_back(goals);
   while (h < closedList.size()) {
-    //cout << "\nh = " << h << endl;
-    //cout << "\n" << actualState << endl;
     for (size_t t = 0; t < costSortedTR.size(); t++) {
       BDD regressed = costSortedTR[t]->preimage(actualState);
       int cost = costSortedTR[t]->getCost();
@@ -169,34 +158,6 @@ void SPDB::create_spdb(const TaskProxy &task_proxy,
 }
 
 int SPDB::get_value(const State &state) const {
-/*
-// ADD_EVAL EXPERIMENTAL
-  int numVars = 0;
-  for (int e = 0; e < pattern.size(); e++) {
-    numVars += sV->vars_index_pre(e).size();
-  }
-
-  int * input = new int[numVars];
-  for (int z = 0; z < numVars; z++) {
-    for (int j = 0; j < numVars; j++) {
-      input[j] = 0;
-    }
-  }
-
-  for (size_t w = 0; w < pattern.size(); w++) {
-    int var_id = state[pattern[w]].get_variable().get_id();
-    int val = state[pattern[w]].get_value();
-    BDD st = sV->preBDD(var_id, val); 
-    for (int index : sV->vars_index_pre(var_id)) {
-      if (sV->bddVar(index) * st != sV->zeroBDD()) {
-        input[index/2] = 1;
-      }
-    }
-  }
-  int hE = Cudd_V((heuristic.Eval(input)).FindMin().getNode());
-  cout << "ADD_EVAL: " << hE << endl;
-*/
-// NORMAL MULTIPLICATION!
   BDD stateBDD = sV->oneBDD();
   for (size_t w = 0; w < pattern.size(); w++) {
     int var_id = state[pattern[w]].get_variable().get_id();
@@ -205,9 +166,6 @@ int SPDB::get_value(const State &state) const {
     stateBDD *= st;
   }
   ADD hval = (stateBDD.Add() * heuristic);
-  int hv = Cudd_V(hval.FindMax().getNode());
-  //cout << "MULTIPLICATION: " << hv << endl;
-  //cout << endl; 
   return Cudd_V(hval.FindMax().getNode());
 }
 
