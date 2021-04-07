@@ -123,7 +123,6 @@ BDD one = sV->oneBDD();
   BDD vis = goals;
   closed.emplace_back(goals);
   while (i < closed.size()){
-    cout << "i = " << i << endl;
     for (int a = 0; a < mergedTR.size(); a++) {
       if (mergedTR[a] == 0) { continue; }
       BDD regression = mergedTR[a]->preimage(actState);
@@ -133,14 +132,12 @@ BDD one = sV->oneBDD();
       if (closed.size() <= i + a) {
         closed.resize(i + a + 1, zero);
         closed[i + a] = regression * !vis;
-        cout << "NEW ENTRY! " << i + a << endl;
       } else {
         closed[i + a] |= regression;
       }
       closed[i + a] *= !vis;
     }
     i++;
-    cout << i << "  " << closed.size();
     if (i >= closed.size()) {break;}
     //if ((closed[i] *= !vis) == zero) {closed.resize(i); break;}
     closed[i] *= !vis; 
